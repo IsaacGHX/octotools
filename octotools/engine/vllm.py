@@ -27,6 +27,9 @@ class ChatVLLM(EngineLM, CachedEngine):
         system_prompt=DEFAULT_SYSTEM_PROMPT,
         is_multimodal: bool=False,
         use_cache: bool=True,
+        base_url=None,
+        api_key=None,
+        check_model: bool=True,
         **kwargs):
         """
         :param model_string:
@@ -46,17 +49,17 @@ class ChatVLLM(EngineLM, CachedEngine):
             os.makedirs(self.image_cache_dir, exist_ok=True)
             super().__init__(cache_path=cache_path)
         
+        # 使用传入的base_url或从环境变量获取，否则使用默认值
+        self.base_url = base_url or os.environ.get("VLLM_BASE_URL", "http://localhost:8888/v1")
+        self.api_key = api_key or os.environ.get("VLLM_API_KEY", "dummy-token")
+
         try:
             self.client = OpenAI(
-                base_url="http://localhost:8888/v1",
-                api_key="dummy-token",
+                base_url=self.base_url,
+                api_key=self.api_key,
             )
         except Exception as e:
-            raise ValueError(f"Failed to connect to VLLM server. Please ensure the server is running and try again. Please ensure that the model is running at localhost:8888.")
-
-        if self.client.models.list().data[0].id != self.model_string:
-            raise ValueError(f"The VLLM server is running, but the model {self.model_string} is not available. Please check the model name and try again.")
-
+            raise ValueError(f"Failed to connect to VLLM server at {self.base_url}. Please ensure the server is running and try again.")
 
     def generate(self, content: Union[str, List[Union[str, bytes]]], system_prompt=None, **kwargs):
         if isinstance(content, str):
@@ -69,7 +72,7 @@ class ChatVLLM(EngineLM, CachedEngine):
             return self._generate_multimodal(content, system_prompt=system_prompt, **kwargs)
         
     def _generate_text(
-        self, prompt, system_prompt=None, temperature=0, max_tokens=4000, top_p=0.99, response_format=None
+        self, prompt, system_prompt=None, temperature=0, max_tokens=512, top_p=0.99, response_format=None
     ):
 
         sys_prompt_arg = system_prompt if system_prompt else self.system_prompt
@@ -125,7 +128,7 @@ class ChatVLLM(EngineLM, CachedEngine):
         return formatted_content
 
     def _generate_multimodal(
-        self, content: List[Union[str, bytes]], system_prompt=None, temperature=0, max_tokens=4000, top_p=0.99, response_format=None
+        self, content: List[Union[str, bytes]], system_prompt=None, temperature=0, max_tokens=512, top_p=0.99, response_format=None
     ):
         sys_prompt_arg = system_prompt if system_prompt else self.system_prompt
         formatted_content = self._format_content(content)

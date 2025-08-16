@@ -11,12 +11,15 @@ from octotools.models.memory import Memory
 
 
 class Planner:
-    def __init__(self, llm_engine_name: str, toolbox_metadata: dict = None, available_tools: List = None, verbose: bool = False):
+    def __init__(self, llm_engine_name: str, toolbox_metadata: dict = None, available_tools: List = None, 
+    verbose: bool = False, base_url: str = None, is_multimodal: bool = False, check_model: bool = True, temperature : float = .0):
         self.llm_engine_name = llm_engine_name
-        self.llm_engine_mm = create_llm_engine(model_string=llm_engine_name, is_multimodal=True)
-        self.llm_engine = create_llm_engine(model_string=llm_engine_name, is_multimodal=False)
+        self.is_multimodal = is_multimodal
+        self.llm_engine_mm = create_llm_engine(model_string=llm_engine_name, is_multimodal=True, base_url=base_url, check_model=check_model)
+        self.llm_engine = create_llm_engine(model_string=llm_engine_name, is_multimodal=False, base_url=base_url, check_model=check_model)
         self.toolbox_metadata = toolbox_metadata if toolbox_metadata is not None else {}
         self.available_tools = available_tools if available_tools is not None else []
+
         self.verbose = verbose
     def get_image_info(self, image_path: str) -> Dict[str, Any]:
         image_info = {}
@@ -33,7 +36,7 @@ class Planner:
                 print(f"Error processing image file: {str(e)}")
         return image_info
 
-    def generate_base_response(self, question: str, image: str, max_tokens: str = 4000) -> str:
+    def generate_base_response(self, question: str, image: str, max_tokens: int = 512) -> str:
         image_info = self.get_image_info(image)
 
         input_data = [question]
@@ -52,7 +55,8 @@ class Planner:
     def analyze_query(self, question: str, image: str) -> str:
         image_info = self.get_image_info(image)
 
-        query_prompt = f"""
+        if self.is_multimodal:
+            query_prompt = f"""
 Task: Analyze the given query with accompanying inputs and determine the skills and tools needed to address it effectively.
 
 Available tools: {self.available_tools}
@@ -77,7 +81,25 @@ Your response should include:
 4. Any additional considerations that might be important for addressing the query effectively.
 
 Please present your analysis in a clear, structured format.
-"""
+                        """
+        else: 
+            query_prompt = f"""
+Task: Analyze the given query to determine necessary skills and tools.
+
+Inputs:
+- Available tools: {self.available_tools}
+- Metadata for tools: {self.toolbox_metadata}
+- Query: {question}
+
+Instructions:
+1. Identify the main objectives in the query.
+2. List the necessary skills and tools.
+3. For each skill and tool, explain how it helps address the query.
+4. Note any additional considerations.
+
+Format your response with a summary of the query, lists of skills and tools with explanations, and a section for additional considerations.
+                            """
+
 
         input_data = [query_prompt]
         if image_info:
@@ -136,7 +158,8 @@ Please present your analysis in a clear, structured format.
         return context, sub_goal, tool_name
 
     def generate_next_step(self, question: str, image: str, query_analysis: str, memory: Memory, step_count: int, max_step_count: int) -> Any:
-        prompt_generate_next_step = f"""
+        if self.is_multimodal:
+            prompt_generate_next_step = f"""
 Task: Determine the optimal next step to address the given query based on the provided analysis, available tools, and previous steps taken.
 
 Context:
@@ -160,11 +183,11 @@ Instructions:
 1. Analyze the context thoroughly, including the query, its analysis, any image, available tools and their metadata, and previous steps taken.
 
 2. Determine the most appropriate next step by considering:
-   - Key objectives from the query analysis
-   - Capabilities of available tools
-   - Logical progression of problem-solving
-   - Outcomes from previous steps
-   - Current step count and remaining steps
+- Key objectives from the query analysis
+- Capabilities of available tools
+- Logical progression of problem-solving
+- Outcomes from previous steps
+- Current step count and remaining steps
 
 3. Select ONE tool best suited for the next step, keeping in mind the limited number of remaining steps.
 
@@ -181,10 +204,10 @@ Tool Name: <tool_name>
 
 Where:
 - <context> MUST include ALL necessary information for the tool to function, structured as follows:
-  * Relevant data from previous steps
-  * File names or paths created or used in previous steps (list EACH ONE individually)
-  * Variable names and their values from previous steps' results
-  * Any other context-specific information required by the tool
+* Relevant data from previous steps
+* File names or paths created or used in previous steps (list EACH ONE individually)
+* Variable names and their values from previous steps' results
+* Any other context-specific information required by the tool
 - <sub_goal> is a specific, achievable objective for the tool, based on its metadata and previous outcomes.
 It MUST contain any involved data, file names, and variables from Previous Steps and Their Results that the tool can act upon.
 - <tool_name> MUST be the exact name of a tool from the available tools list.
@@ -205,14 +228,43 @@ Sub-Goal: Detect and count the number of specific objects in the image "example/
 Tool Name: Object_Detector_Tool
 
 Remember: Your response MUST end with the Context, Sub-Goal, and Tool Name sections, with NO additional content afterwards.
-"""
+                        """
+        else:
+            prompt_generate_next_step = f"""
+Task: Determine the optimal next step to address the query using available tools and previous steps.
+
+Context:
+- **Query:** {question}
+- **Query Analysis:** {query_analysis}
+- **Available Tools:** {self.available_tools}
+- **Previous Steps:** {memory.get_actions()}
+
+Instructions:
+1. Analyze the query, previous steps, and available tools.
+2. Select the **single best tool** for the next step.
+3. Formulate a specific, achievable **sub-goal** for that tool.
+4. Provide all necessary **context** (data, file names, variables) for the tool to function.
+
+Response Format:
+1.  **Justification:** Explain your choice of tool and sub-goal.
+2.  **Context:** Provide all necessary information for the tool.
+3.  **Sub-Goal:** State the specific objective for the tool.
+4.  **Tool Name:** State the exact name of the selected tool.
+
+Rules:
+- Select only ONE tool.
+- The sub-goal must be directly achievable by the selected tool.
+- The Context section must contain all information the tool needs to function.
+- The response must end with the Context, Sub-Goal, and Tool Name sections in that order, with no extra content.
+                    """
+            
         next_step = self.llm_engine(prompt_generate_next_step, response_format=NextStep)
         return next_step
 
     def verificate_context(self, question: str, image: str, query_analysis: str, memory: Memory) -> Any:
         image_info = self.get_image_info(image)
-
-        prompt_memory_verification = f"""
+        if self.is_multimodal:
+            prompt_memory_verification = f"""
 Task: Thoroughly evaluate the completeness and accuracy of the memory for fulfilling the given query, considering the potential need for additional tool usage.
 
 Context:
@@ -273,6 +325,30 @@ Conclusion: CONTINUE
 
 IMPORTANT: Your response MUST end with either 'Conclusion: STOP' or 'Conclusion: CONTINUE' and nothing else. Ensure your explanation thoroughly justifies this conclusion.
 """
+        else:
+            prompt_memory_verification = f"""
+Task: Evaluate if the current memory is complete and accurate enough to answer the query, or if more tools are needed.
+
+Context:
+- **Query:** {question}
+- **Available Tools:** {self.available_tools}
+- **Initial Analysis:** {query_analysis}
+- **Memory (Tools Used & Results):** {memory.get_actions()}
+
+Instructions:
+1.  Review the query, initial analysis, and memory.
+2.  Assess the completeness of the memory: Does it fully address all parts of the query?
+3.  Check for potential issues:
+    -   Are there any inconsistencies or contradictions?
+    -   Is any information ambiguous or in need of verification?
+4.  Determine if any unused tools could provide missing information.
+
+Final Determination:
+-   If the memory is sufficient, explain why and conclude with "STOP".
+-   If more information is needed, explain what's missing, which tools could help, and conclude with "CONTINUE".
+
+IMPORTANT: The response must end with either "Conclusion: STOP" or "Conclusion: CONTINUE".
+"""
 
         input_data = [prompt_memory_verification]
         if image_info:
@@ -326,8 +402,8 @@ IMPORTANT: Your response MUST end with either 'Conclusion: STOP' or 'Conclusion:
 
     def generate_final_output(self, question: str, image: str, memory: Memory) -> str:
         image_info = self.get_image_info(image)
-
-        prompt_generate_final_output = f"""
+        if self.is_multimodal:
+            prompt_generate_final_output = f"""
 Task: Generate the final output based on the query, image, and tools used in the process.
 
 Context:
@@ -369,6 +445,24 @@ Your response should be well-organized and include the following sections:
    - Summarize the main points and reinforce the answer to the query.
    - If appropriate, suggest potential next steps or areas for further investigation.
 """
+        else:
+                prompt_generate_final_output = f"""
+Task: Generate the final output based on the query and the results from all tools used.
+
+Context:
+- **Query:** {question}
+- **Actions Taken:** {memory.get_actions()}
+
+Instructions:
+1. Review the query and the results from all tool executions.
+2. Incorporate the relevant information to create a coherent, step-by-step final output.
+
+Output Structure:
+- **Summary:** A brief overview of the query and the main findings.
+- **Detailed Analysis:** A step-by-step breakdown of the process. For each step, mention the tool used, its purpose, and the key results.
+- **Answer to the Query:** A direct and clear answer to the original question. If the query has multiple parts, address each one.
+- **Conclusion:** A summary of the main points.
+"""
 
         input_data = [prompt_generate_final_output]
         if image_info:
@@ -386,8 +480,8 @@ Your response should be well-organized and include the following sections:
 
     def generate_direct_output(self, question: str, image: str, memory: Memory) -> str:
         image_info = self.get_image_info(image)
-
-        prompt_generate_final_output = f"""
+        if self.is_multimodal:
+            prompt_generate_final_output = f"""
 Context:
 Query: {question}
 Image: {image_info}
@@ -399,6 +493,24 @@ Actions Taken:
 Please generate the concise output based on the query, image information, initial analysis, and actions taken. Break down the process into clear, logical, and conherent steps. Conclude with a precise and direct answer to the query.
 
 Answer:
+"""
+        else:
+            prompt_generate_final_output = f"""
+Task: Generate a concise final answer to the query based on all provided context.
+
+Context:
+- **Query:** {question}
+- **Initial Analysis:** {self.query_analysis}
+- **Actions Taken:** {memory.get_actions()}
+
+Instructions:
+1. Review the query and the results from all actions.
+2. Synthesize the key findings into a clear, step-by-step summary of the process.
+3. Provide a direct, precise answer to the original query.
+
+Output Structure:
+1.  **Process Summary:** A clear, step-by-step breakdown of how the query was addressed, including the purpose and key results of each action.
+2.  **Answer:** A direct and concise final answer to the query.
 """
 
         input_data = [prompt_generate_final_output]

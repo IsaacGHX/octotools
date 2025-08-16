@@ -5,24 +5,27 @@ import inspect
 import traceback
 from typing import Dict, Any, List, Tuple
 import time
+
 class Initializer:
-    def __init__(self, enabled_tools: List[str] = [], model_string: str = None, verbose: bool = False, vllm_config_path: str = None):
+    def __init__(self, enabled_tools: List[str] = [], model_string: str = None, verbose: bool = False, vllm_config_path: str = None, base_url: str = None, check_model: bool = True):
         self.toolbox_metadata = {}
         self.available_tools = []
         self.enabled_tools = enabled_tools
         self.load_all = self.enabled_tools == ["all"]
-        self.model_string = model_string # llm model string
+        self.model_string = model_string
         self.verbose = verbose
         self.vllm_server_process = None
         self.vllm_config_path = vllm_config_path
+        self.base_url = base_url
+        self.check_model = check_model
         print("\n==> Initializing octotools...")
         print(f"Enabled tools: {self.enabled_tools}")
         print(f"LLM engine name: {self.model_string}")
         self._set_up_tools()
         
         # if vllm, set up the vllm server
-        if model_string.startswith("vllm-"):
-            self.setup_vllm_server()
+        # if model_string.startswith("vllm-"):
+        #     self.setup_vllm_server()
 
     def get_project_root(self):
         current_dir = os.path.dirname(os.path.abspath(__file__))
