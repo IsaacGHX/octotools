@@ -190,7 +190,11 @@ def construct_solver(llm_engine_name : str = "gpt-4o",
                      max_tokens : int = 4000,
                      root_cache_dir : str = "solver_cache",
                      verbose : bool = True,
-                     vllm_config_path : str = None):
+                     vllm_config_path : str = None,
+                     base_url : str = None,
+                     check_model : bool = True,
+                     temperature: float = 0.0
+                     ):
     
     # Instantiate Initializer
     initializer = Initializer(
@@ -206,6 +210,8 @@ def construct_solver(llm_engine_name : str = "gpt-4o",
         toolbox_metadata=initializer.toolbox_metadata,
         available_tools=initializer.available_tools,
         verbose=verbose,
+        base_url=base_url,
+        check_model=check_model,
     )
 
     # Instantiate Memory
@@ -216,6 +222,8 @@ def construct_solver(llm_engine_name : str = "gpt-4o",
         llm_engine_name=llm_engine_name,
         root_cache_dir=root_cache_dir,
         verbose=verbose,
+        base_url=base_url,
+        check_model=check_model,
     )
 
     # Instantiate Solver
