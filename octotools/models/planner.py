@@ -15,8 +15,8 @@ class Planner:
     verbose: bool = False, base_url: str = None, is_multimodal: bool = False, check_model: bool = True, temperature : float = .0):
         self.llm_engine_name = llm_engine_name
         self.is_multimodal = is_multimodal
-        self.llm_engine_mm = create_llm_engine(model_string=llm_engine_name, is_multimodal=True, base_url=base_url, check_model=check_model)
-        self.llm_engine = create_llm_engine(model_string=llm_engine_name, is_multimodal=False, base_url=base_url, check_model=check_model)
+        self.llm_engine_mm = create_llm_engine(model_string=llm_engine_name, is_multimodal=True, base_url=base_url, temperature = temperature)
+        self.llm_engine = create_llm_engine(model_string=llm_engine_name, is_multimodal=False, base_url=base_url, temperature = temperature)
         self.toolbox_metadata = toolbox_metadata if toolbox_metadata is not None else {}
         self.available_tools = available_tools if available_tools is not None else []
 
@@ -36,7 +36,7 @@ class Planner:
                 print(f"Error processing image file: {str(e)}")
         return image_info
 
-    def generate_base_response(self, question: str, image: str, max_tokens: int = 512) -> str:
+    def generate_base_response(self, question: str, image: str, max_tokens: int = 2048) -> str:
         image_info = self.get_image_info(image)
 
         input_data = [question]

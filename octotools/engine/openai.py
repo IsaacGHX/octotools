@@ -137,7 +137,7 @@ class ChatOpenAI(EngineLM, CachedEngine):
             }
         
     def _generate_text(
-        self, prompt, system_prompt=None, temperature=0, max_tokens=4000, top_p=0.99, response_format=None
+        self, prompt, system_prompt=None, temperature=0, max_tokens=2048, top_p=0.99, response_format=None
     ):
 
         sys_prompt_arg = system_prompt if system_prompt else self.system_prompt

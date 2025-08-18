@@ -72,7 +72,7 @@ class ChatVLLM(EngineLM, CachedEngine):
             return self._generate_multimodal(content, system_prompt=system_prompt, **kwargs)
         
     def _generate_text(
-        self, prompt, system_prompt=None, temperature=0, max_tokens=512, top_p=0.99, response_format=None
+        self, prompt, system_prompt=None, temperature=0, max_tokens=2048, top_p=0.99, response_format=None
     ):
 
         sys_prompt_arg = system_prompt if system_prompt else self.system_prompt
@@ -128,7 +128,7 @@ class ChatVLLM(EngineLM, CachedEngine):
         return formatted_content
 
     def _generate_multimodal(
-        self, content: List[Union[str, bytes]], system_prompt=None, temperature=0, max_tokens=512, top_p=0.99, response_format=None
+        self, content: List[Union[str, bytes]], system_prompt=None, temperature=0, max_tokens=2048, top_p=0.99, response_format=None
     ):
         sys_prompt_arg = system_prompt if system_prompt else self.system_prompt
         formatted_content = self._format_content(content)

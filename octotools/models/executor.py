@@ -19,7 +19,8 @@ def timeout_handler(signum, frame):
     raise TimeoutError("Function execution timed out")
 
 class Executor:
-    def __init__(self, llm_engine_name: str, root_cache_dir: str = "solver_cache",  num_threads: int = 1, max_time: int = 120, max_output_length: int = 100000, verbose: bool = False, base_url: str = None, check_model: bool = True):
+    def __init__(self, llm_engine_name: str, root_cache_dir: str = "solver_cache",  num_threads: int = 1, max_time: int = 120, 
+    max_output_length: int = 100000, verbose: bool = False, base_url: str = None, check_model: bool = True, temperature: float = .0):
         self.llm_engine_name = llm_engine_name
         self.root_cache_dir = root_cache_dir
         self.num_threads = num_threads
@@ -28,7 +29,7 @@ class Executor:
         self.verbose = verbose
         self.base_url = base_url
         self.check_model = check_model
-
+        self.temperature  = temperature
     def set_query_cache_dir(self, query_cache_dir):
         if query_cache_dir:
             self.query_cache_dir = query_cache_dir
@@ -153,6 +154,7 @@ Instructions:
 2.  Construct valid Python code that addresses the sub-goal using the provided context and data.
 3.  The command must include at least one call to `tool.execute()`.
 4.  Each `tool.execute()` call must be assigned to a variable named **`execution`**.
+5.  Please give the exact numbers and parameters should be used in the `tool.execute()` call.
 
 Output Format:
 Present your response in the following structured format. Do not include any extra text or explanations.
@@ -164,16 +166,16 @@ Generated Command:
 
 Example1:
 ```python
-execution = tool.execute(prompt="Summarize the following text in a few lines")
+execution = tool.execute(prompt="Summarize the following porblom:"Isaac has 100 toys, masa gets ...., how much are their together?")
 ```
 
 Example2:
 ```python
-execution = tool.execute(prompt="Solve the following equation.")
+execution = tool.execute(prompt="Solve the following equation when a = 90, b = 9000")
 ```
 """
 
-        llm_generate_tool_command = create_llm_engine(model_string=self.llm_engine_name, is_multimodal=False, base_url=self.base_url, check_model=self.check_model)
+        llm_generate_tool_command = create_llm_engine(model_string=self.llm_engine_name, is_multimodal=False, base_url=self.base_url, check_model=self.check_model, temperature = self.temperature)
         tool_command = llm_generate_tool_command(prompt_generate_tool_command, response_format=ToolCommand)
 
         return tool_command

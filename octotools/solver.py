@@ -20,7 +20,8 @@ class Solver:
         max_time: int = 300,
         max_tokens: int = 4000,
         root_cache_dir: str = "cache",
-        verbose: bool = True
+        verbose: bool = True, 
+        temperature: float = .0
     ):
         self.planner = planner
         self.memory = memory
@@ -30,6 +31,7 @@ class Solver:
         self.max_tokens = max_tokens
         self.root_cache_dir = root_cache_dir
         self.output_types = output_types.lower().split(',')
+        self.temperature  = temperature
         assert all(output_type in ["base", "final", "direct"] for output_type in self.output_types), "Invalid output type. Supported types are 'base', 'final', 'direct'."
         self.verbose = verbose
     def solve(self, question: str, image_path: Optional[str] = None):
@@ -211,7 +213,7 @@ def construct_solver(llm_engine_name : str = "gpt-4o",
         available_tools=initializer.available_tools,
         verbose=verbose,
         base_url=base_url,
-        check_model=check_model,
+        temperature=temperature
     )
 
     # Instantiate Memory
@@ -223,7 +225,7 @@ def construct_solver(llm_engine_name : str = "gpt-4o",
         root_cache_dir=root_cache_dir,
         verbose=verbose,
         base_url=base_url,
-        check_model=check_model,
+        temperature=temperature
     )
 
     # Instantiate Solver
@@ -237,6 +239,7 @@ def construct_solver(llm_engine_name : str = "gpt-4o",
         max_tokens=max_tokens,
         root_cache_dir=root_cache_dir,
         verbose=verbose,
+        temperature=temperature
     )
     return solver
 
