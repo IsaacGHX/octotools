@@ -54,7 +54,7 @@ def create_llm_engine(model_string: str, use_cache: bool = False, is_multimodal:
     elif "vllm" in model_string:
         from .vllm import ChatVLLM
         model_string = model_string.replace("vllm-", "")
-        kwargs.setdefault("repetition_penalty", 1.05)
+        kwargs.setdefault("repetition_penalty", 1.2)
         return ChatVLLM(model_string=model_string, use_cache=use_cache, is_multimodal=is_multimodal, **kwargs)
 
     elif "litellm" in model_string:

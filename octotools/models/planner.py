@@ -456,12 +456,6 @@ Context:
 Instructions:
 1. Review the query and the results from all tool executions.
 2. Incorporate the relevant information to create a coherent, step-by-step final output.
-
-Output Structure:
-- **Summary:** A brief overview of the query and the main findings.
-- **Detailed Analysis:** A step-by-step breakdown of the process. For each step, mention the tool used, its purpose, and the key results.
-- **Answer to the Query:** A direct and clear answer to the original question. If the query has multiple parts, address each one.
-- **Conclusion:** A summary of the main points.
 """
 
         input_data = [prompt_generate_final_output]
