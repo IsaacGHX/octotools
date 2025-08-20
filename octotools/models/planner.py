@@ -171,7 +171,7 @@ Be biref and precise with insight.
 
         return context, sub_goal, tool_name
 
-    def generate_next_step(self, question: str, image: str, query_analysis: str, memory: Memory, step_count: int, max_step_count: int, json_data: Any) -> Any:
+    def generate_next_step(self, question: str, image: str, query_analysis: str, memory: Memory, step_count: int, max_step_count: int, json_data: Any = None) -> Any:
         if self.is_multimodal:
             prompt_generate_next_step = f"""
 Task: Determine the optimal next step to address the given query based on the provided analysis, available tools, and previous steps taken.
@@ -273,11 +273,12 @@ Rules:
                     """
             
         next_step = self.llm_engine(prompt_generate_next_step, response_format=NextStep)
-        json_data[f"action_predictor_{step_count}_prompt"] = prompt_generate_next_step
-        json_data[f"action_predictor_{step_count}_response"] = str(next_step)
+        if json_data is not None:
+            json_data[f"action_predictor_{step_count}_prompt"] = prompt_generate_next_step
+            json_data[f"action_predictor_{step_count}_response"] = str(next_step)
         return next_step
 
-    def verificate_context(self, question: str, image: str, query_analysis: str, memory: Memory, step_count: int, json_data: Any) -> Any:
+    def verificate_context(self, question: str, image: str, query_analysis: str, memory: Memory, step_count: int = 0, json_data: Any = None) -> Any:
         image_info = self.get_image_info(image)
         if self.is_multimodal:
             prompt_memory_verification = f"""
@@ -376,9 +377,9 @@ IMPORTANT: The response must end with either "Conclusion: STOP" or "Conclusion: 
                 print(f"Error reading image file: {str(e)}")
 
         stop_verification = self.llm_engine_mm(input_data, response_format=MemoryVerification)
-        
-        json_data[f"verifier_{step_count}_prompt"] = input_data
-        json_data[f"verifier_{step_count}_response"] = str(stop_verification)
+        if json_data is not None:
+            json_data[f"verifier_{step_count}_prompt"] = input_data
+            json_data[f"verifier_{step_count}_response"] = str(stop_verification)
         return stop_verification
 
     def extract_conclusion(self, response: Any) -> tuple:

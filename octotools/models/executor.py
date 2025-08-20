@@ -38,7 +38,7 @@ class Executor:
             self.query_cache_dir = os.path.join(self.root_cache_dir, timestamp)
         os.makedirs(self.query_cache_dir, exist_ok=True)
 
-    def generate_tool_command(self, question: str, image: str, context: str, sub_goal: str, tool_name: str, tool_metadata: Dict[str, Any], step_count: int, json_data: Any) -> Any:
+    def generate_tool_command(self, question: str, image: str, context: str, sub_goal: str, tool_name: str, tool_metadata: Dict[str, Any], step_count: int = 0, json_data: Any = None) -> Any:
 #         prompt_generate_tool_command = f"""
 # Task: Generate a precise command to execute the selected tool based on the given information.
 
@@ -165,11 +165,13 @@ Generated Command:
 ```
 
 Example1:
+Generated Command:
 ```python
 execution = tool.execute(prompt="Summarize the following porblom:"Isaac has 100 toys, masa gets ...., how much are their together?")
 ```
 
 Example2:
+Generated Command:
 ```python
 execution = tool.execute(prompt="Solve the following equation when a = 90, b = 9000")
 ```
@@ -177,41 +179,71 @@ execution = tool.execute(prompt="Solve the following equation when a = 90, b = 9
 
         llm_generate_tool_command = create_llm_engine(model_string=self.llm_engine_name, is_multimodal=False, base_url=self.base_url, check_model=self.check_model, temperature = self.temperature)
         tool_command = llm_generate_tool_command(prompt_generate_tool_command, response_format=ToolCommand)
-        json_data[f"tool_commander_{step_count}_prompt"] = prompt_generate_tool_command
-        json_data[f"tool_commander_{step_count}_response"] = str(tool_command)
+        if json_data is not None:
+            json_data[f"tool_commander_{step_count}_prompt"] = prompt_generate_tool_command
+            json_data[f"tool_commander_{step_count}_response"] = str(tool_command)
 
         return tool_command
 
     def extract_explanation_and_command(self, response: Any) -> tuple:
         def normalize_code(code: str) -> str:
-            # Remove leading and trailing whitespace and triple backticks
+            # Remove leading/trailing whitespace and triple backticks if present
             return re.sub(r'^```python\s*', '', code).rstrip('```').strip()
 
+        analysis = "No analysis found."
+        explanation = "No explanation found."
+        command = "No command found."
+
         if isinstance(response, str):
-            # Attempt to parse the response as JSON
+            # Attempt to parse as JSON first
             try:
                 response_dict = json.loads(response)
-                response = ToolCommand(**response_dict)
+                response_obj = ToolCommand(**response_dict)
+                analysis = response_obj.analysis.strip()
+                explanation = response_obj.explanation.strip()
+                command = response_obj.command.strip()
             except Exception as e:
                 print(f"Failed to parse response as JSON: {str(e)}")
-        if isinstance(response, ToolCommand):
+                # Fall back to regex parsing on string
+                try:
+                    # Extract analysis
+                    analysis_pattern = r"Analysis:(.*?)Command Explanation"
+                    analysis_match = re.search(analysis_pattern, response, re.DOTALL | re.IGNORECASE)
+                    analysis = analysis_match.group(1).strip() if analysis_match else "No analysis found."
+
+                    # Extract explanation
+                    explanation_pattern = r"Command Explanation:(.*?)Generated Command"
+                    explanation_match = re.search(explanation_pattern, response, re.DOTALL | re.IGNORECASE)
+                    explanation = explanation_match.group(1).strip() if explanation_match else "No explanation found."
+
+                    # Extract command using "Generated Command:" prefix
+                    command_pattern = r"Generated Command:.*?```python\n(.*?)```"
+                    command_match = re.search(command_pattern, response, re.DOTALL | re.IGNORECASE)
+                    if command_match:
+                        command = command_match.group(1).strip()
+                    else:
+                        # Fallback: Extract ANY ```python ... ``` block (even without prefix)
+                        loose_command_pattern = r"```python\s*\n(.*?)```"
+                        loose_match = re.findall(loose_command_pattern, response, re.DOTALL | re.IGNORECASE)
+                        if loose_match:
+                            # Take the last or most complete one? Or first meaningful?
+                            # Here we take the longest one as heuristic
+                            command = max(loose_match, key=lambda x: len(x.strip())).strip()
+                        else:
+                            command = "No command found."
+                except Exception as e:
+                    print(f"Error during regex parsing: {str(e)}")
+                    analysis = "Parsing error."
+                    explanation = "Parsing error."
+                    command = "No command found."
+        elif isinstance(response, ToolCommand):
             analysis = response.analysis.strip()
             explanation = response.explanation.strip()
             command = response.command.strip()
         else:
-            # Extract analysis
-            analysis_pattern = r"Analysis:(.*?)Command Explanation"
-            analysis_match = re.search(analysis_pattern, response, re.DOTALL)
-            analysis = analysis_match.group(1).strip() if analysis_match else "No analysis found."
-            # Extract explanation
-            explanation_pattern = r"Command Explanation:(.*?)Generated Command"
-            explanation_match = re.search(explanation_pattern, response, re.DOTALL)
-            explanation = explanation_match.group(1).strip() if explanation_match else "No explanation found."
-            # Extract command
-            command_pattern = r"Generated Command:.*?```python\n(.*?)```"
-            command_match = re.search(command_pattern, response, re.DOTALL)
-            command = command_match.group(1).strip() if command_match else "No command found."
+            command = "Invalid response type."
 
+        # Final normalization
         command = normalize_code(command)
 
         return analysis, explanation, command
