@@ -98,7 +98,9 @@ Instructions:
 4. Note any additional considerations.
 
 Format your response with a summary of the query, lists of skills and tools with explanations, and a section for additional considerations.
-                            """
+
+Be biref and precise with insight. 
+"""
 
 
         input_data = [query_prompt]
@@ -117,11 +119,23 @@ Format your response with a summary of the query, lists of skills and tools with
     def extract_context_subgoal_and_tool(self, response: Any) -> Tuple[str, str, str]:
 
         def normalize_tool_name(tool_name: str) -> str:
-            # Normalize the tool name to match the available tools
+            """
+            Normalizes a tool name robustly using regular expressions.
+            It handles any combination of spaces and underscores as separators.
+            """
+            def to_canonical(name: str) -> str:
+                # Split the name by any sequence of one or more spaces or underscores
+                parts = re.split('[ _]+', name)
+                # Join the parts with a single underscore and convert to lowercase
+                return "_".join(part.lower() for part in parts)
+
+            normalized_input = to_canonical(tool_name)
+            
             for tool in self.available_tools:
-                if tool.lower() in tool_name.lower():
+                if to_canonical(tool) == normalized_input:
                     return tool
-            return "No matched tool given: " + tool_name
+                    
+            return f"No matched tool given: {tool_name}"
 
         try:
             if isinstance(response, str):
@@ -157,7 +171,7 @@ Format your response with a summary of the query, lists of skills and tools with
 
         return context, sub_goal, tool_name
 
-    def generate_next_step(self, question: str, image: str, query_analysis: str, memory: Memory, step_count: int, max_step_count: int) -> Any:
+    def generate_next_step(self, question: str, image: str, query_analysis: str, memory: Memory, step_count: int, max_step_count: int, json_data: Any) -> Any:
         if self.is_multimodal:
             prompt_generate_next_step = f"""
 Task: Determine the optimal next step to address the given query based on the provided analysis, available tools, and previous steps taken.
@@ -259,9 +273,11 @@ Rules:
                     """
             
         next_step = self.llm_engine(prompt_generate_next_step, response_format=NextStep)
+        json_data[f"action_predictor_{step_count}_prompt"] = prompt_generate_next_step
+        json_data[f"action_predictor_{step_count}_response"] = str(next_step)
         return next_step
 
-    def verificate_context(self, question: str, image: str, query_analysis: str, memory: Memory) -> Any:
+    def verificate_context(self, question: str, image: str, query_analysis: str, memory: Memory, step_count: int, json_data: Any) -> Any:
         image_info = self.get_image_info(image)
         if self.is_multimodal:
             prompt_memory_verification = f"""
@@ -360,7 +376,9 @@ IMPORTANT: The response must end with either "Conclusion: STOP" or "Conclusion: 
                 print(f"Error reading image file: {str(e)}")
 
         stop_verification = self.llm_engine_mm(input_data, response_format=MemoryVerification)
-
+        
+        json_data[f"verifier_{step_count}_prompt"] = input_data
+        json_data[f"verifier_{step_count}_response"] = str(stop_verification)
         return stop_verification
 
     def extract_conclusion(self, response: Any) -> tuple:

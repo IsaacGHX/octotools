@@ -38,7 +38,7 @@ class Executor:
             self.query_cache_dir = os.path.join(self.root_cache_dir, timestamp)
         os.makedirs(self.query_cache_dir, exist_ok=True)
 
-    def generate_tool_command(self, question: str, image: str, context: str, sub_goal: str, tool_name: str, tool_metadata: Dict[str, Any]) -> Any:
+    def generate_tool_command(self, question: str, image: str, context: str, sub_goal: str, tool_name: str, tool_metadata: Dict[str, Any], step_count: int, json_data: Any) -> Any:
 #         prompt_generate_tool_command = f"""
 # Task: Generate a precise command to execute the selected tool based on the given information.
 
@@ -177,6 +177,8 @@ execution = tool.execute(prompt="Solve the following equation when a = 90, b = 9
 
         llm_generate_tool_command = create_llm_engine(model_string=self.llm_engine_name, is_multimodal=False, base_url=self.base_url, check_model=self.check_model, temperature = self.temperature)
         tool_command = llm_generate_tool_command(prompt_generate_tool_command, response_format=ToolCommand)
+        json_data[f"tool_commander_{step_count}_prompt"] = prompt_generate_tool_command
+        json_data[f"tool_commander_{step_count}_response"] = str(tool_command)
 
         return tool_command
 

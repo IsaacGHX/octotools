@@ -190,7 +190,7 @@ class Initializer:
         self.vllm_server_process = vllm_process
 
 if __name__ == "__main__":
-    enabled_tools = ["Generalist_Solution_Generator_Tool"]
+    enabled_tools = ["Generalist_Solution_Generator_Tool", "Python_Code_Generator_Tool"]
     initializer = Initializer(enabled_tools=enabled_tools)
 
     print("\nAvailable tools:")

@@ -94,7 +94,8 @@ class Solver:
                     query_analysis, 
                     self.memory, 
                     step_count, 
-                    self.max_steps
+                    self.max_steps,
+                    json_data
                 )
                 context, sub_goal, tool_name = self.planner.extract_context_subgoal_and_tool(next_step)
                 if self.verbose:
@@ -116,7 +117,9 @@ class Solver:
                         context, 
                         sub_goal, 
                         tool_name, 
-                        self.planner.toolbox_metadata[tool_name]
+                        self.planner.toolbox_metadata[tool_name],
+                        step_count,
+                        json_data
                     )
                     analysis, explanation, command = self.executor.extract_explanation_and_command(tool_command)
                     if self.verbose:
@@ -128,6 +131,8 @@ class Solver:
                     local_start_time = time.time()
                     result = self.executor.execute_tool_command(tool_name, command)
                     result = make_json_serializable_truncated(result) # Convert to JSON serializable format
+                    json_data[f"tool_result_{step_count}"] = result
+
                     if self.verbose:
                         print(f"\n==> 🛠️ Step {step_count}: Command Execution ({tool_name})\n")
                         print(f"[Result]:\n{json.dumps(result, indent=4)}")
@@ -147,7 +152,9 @@ class Solver:
                     question, 
                     image_path, 
                     query_analysis, 
-                    self.memory
+                    self.memory,
+                    step_count,
+                    json_data
                 )
                 context_verification, conclusion = self.planner.extract_conclusion(stop_verification)
                 if self.verbose:
